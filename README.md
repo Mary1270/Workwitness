@@ -114,7 +114,10 @@ Frontend: serve `frontend/` with any static server, put the three deployed addre
 
 ## Honest status
 
-* The offline suite runs against a hand-written SDK stub (the real `genlayer` package could not be installed where this was built). API usage follows patterns previously confirmed on GenLayer Studio, but **the contracts have not been deployed from this repository yet**; do the live steps before relying on them.
-* `scripts/live` and the live GitHub Action are written against `genlayer-js` but were not executed here; pin the version after the first successful run.
+The three contracts were deployed and exercised end to end on GenLayer Studio (test build, 300 s challenge window): submit, open_job, evaluate with validator consensus, challenge and re-evaluation, finalize, score recording, claim closing, bond refunds and withdraw all worked, and PASS, FAIL and INSUFFICIENT_EVIDENCE verdicts were each observed. Addresses and measurements are in LIVE_RESULTS.md.
+
+Not covered by the live run: the recovery calls (retry_open_job, resend_finalization) were never needed, and finality on a production network was not measured. The offline suite runs against a hand-written SDK stub, so it complements the live run and does not replace it. No third-party audit has been done.
+
+scripts/live and the live GitHub Action are written against genlayer-js but were not executed; pin the version after the first successful run.
 
 MIT licensed. Author: Mary1270.
