@@ -88,6 +88,7 @@ After a verdict, a 48-hour window (constructor parameter, 60 s – 7 days) opens
 ```
 contracts/   worklog.py, skill_verifier.py, score_registry.py   (deploy-ready, no comments)
 frontend/    index.html, app.js, lib.js, config.js               (hash-routed, mobile-first)
+docs/        copy of frontend/ served by GitHub Pages
 tests/       offline suite, SDK stub, frontend tests
 scripts/     check_contracts.py, build_release.py, live/        (deploy + live scenarios)
 docs: README, ARCHITECTURE, THREAT_MODEL, SECURITY, TESTING, DEPLOYMENT

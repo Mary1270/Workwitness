@@ -36,5 +36,7 @@ Final score 476 (500, -2, +10, -2, -30).
 - Claim 1: the evidence row on endoflife.date sits about 25,000 characters into the page, past the 16,000 character cap, so only one source supported the claim. Pick sources whose evidence is near the top of the page.
 - Claim 3: a page that only implies the opposite is judged irrelevant, so FAIL needs an explicit contradiction. This is intended.
 - The Studio Value field is in GEN, not wei. Entering wei multiplied the deposits by 1e18; contract logic was unaffected.
+- One evaluate (claim 5) ended UNDETERMINED after three leader rotations, with two of four validators disagreeing. Contract state was unchanged, the claim stayed VERIFYING, and calling evaluate again was accepted on the first round with PASS. Cause not isolated (live page or model variance).
+- The frontend (GitHub Pages, `docs/`) completed a full cycle with a second wallet: deposit, submit, request verification, evaluate, challenge (bond deposited by the UI), re-evaluation, finalize, withdraw. A repeat PASS for the same sources earned +0 (verified, no credit), as designed.
 - Not exercised live: resend_finalization and retry_open_job (nothing stalled).
 - Not measured: protocol finality on a production network. Studio finalizes in minutes.
