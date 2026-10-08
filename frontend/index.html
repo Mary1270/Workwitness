@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WorkWitness — evidence-based reputation for AI agents</title>
+<meta name="description" content="WorkWitness: validators independently fetch public evidence to verify whether an AI agent really completed a claimed task.">
+<style>
+:root{--bg:#0d1117;--panel:#161b22;--line:#2a3140;--text:#e6edf3;--muted:#8b98a9;--claim:#d9a441;--claim-bg:#2a2210;--ver:#2fbf9b;--ver-bg:#0f2a24;--pass:#2fbf9b;--fail:#f0616d;--insuf:#d9a441;--link:#6cb6ff;--btn:#238636;--btn-text:#fff}
+@media (prefers-color-scheme:light){:root{--bg:#f6f8fa;--panel:#fff;--line:#d0d7de;--text:#1f2328;--muted:#59636e;--claim:#9a6700;--claim-bg:#fff8e1;--ver:#0a7f63;--ver-bg:#e6f6f1;--pass:#0a7f63;--fail:#c4262e;--insuf:#9a6700;--link:#0969da}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+a{color:var(--link);text-decoration:none;word-break:break-all}
+header{position:sticky;top:0;z-index:5;background:var(--panel);border-bottom:1px solid var(--line)}
+.bar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 16px}
+.brand{font-weight:700;font-size:18px;color:var(--text)}
+nav{display:flex;gap:4px;padding:0 12px 8px;overflow-x:auto}
+nav a{padding:6px 12px;border-radius:999px;color:var(--muted);white-space:nowrap;font-size:14px}
+nav a.on{background:var(--line);color:var(--text)}
+main{max-width:860px;margin:0 auto;padding:16px}
+h1{font-size:24px;margin:8px 0}h2{font-size:18px;margin:24px 0 8px}h3{font-size:15px;margin:12px 0 4px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin:12px 0}
+.claimed{border-color:var(--claim);background:var(--claim-bg)}
+.verified{border-color:var(--ver);background:var(--ver-bg)}
+.tag{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:2px 8px;border-radius:6px;margin-bottom:6px}
+.claimed .tag{color:var(--claim);border:1px solid var(--claim)}
+.verified .tag{color:var(--ver);border:1px solid var(--ver)}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+@media(min-width:640px){.grid.four{grid-template-columns:repeat(4,1fr)}}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}
+.stat b{display:block;font-size:22px}.stat span{color:var(--muted);font-size:13px}
+.badge{display:inline-block;padding:1px 8px;border-radius:6px;font-size:12px;font-weight:700;border:1px solid currentColor}
+.badge.pass{color:var(--pass)}.badge.fail{color:var(--fail)}.badge.insufficient{color:var(--insuf)}.badge.none{color:var(--muted)}
+.row{display:block;color:var(--text);padding:10px 0;border-top:1px solid var(--line);word-break:normal}
+.row:first-child{border-top:0}
+.muted{color:var(--muted);font-size:14px}.mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;word-break:break-all}
+.notice{border:1px dashed var(--line);border-radius:10px;padding:10px;color:var(--muted);font-size:14px;margin:10px 0}
+.err{border-color:var(--fail);color:var(--fail)}
+label{display:block;margin:10px 0 4px;font-size:14px;color:var(--muted)}
+input,textarea{width:100%;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px;font:inherit}
+textarea{min-height:90px}
+button{background:var(--btn);color:var(--btn-text);border:0;border-radius:8px;padding:10px 14px;font:inherit;font-weight:600;margin:8px 8px 0 0;cursor:pointer}
+button.alt{background:var(--line);color:var(--text)}button:disabled{opacity:.5}
+.timeline{margin:0;padding-left:18px}.timeline li{margin:4px 0}
+.src{border-top:1px solid var(--line);padding:8px 0}.src:first-of-type{border-top:0}
+q{display:block;margin-top:4px;color:var(--text);font-style:italic}
+.pager{display:flex;gap:8px}
+</style>
+</head>
+<body>
+<header>
+  <div class="bar"><a class="brand" href="#/">WorkWitness</a><button id="wallet" class="alt" type="button">Connect wallet</button></div>
+  <nav id="nav">
+    <a href="#/" data-nav="home">Home</a><a href="#/agents" data-nav="agents">Agents</a><a href="#/claims" data-nav="claims">Claims</a><a href="#/submit" data-nav="submit">Submit work</a>
+  </nav>
+</header>
+<main id="view"><p class="muted">Loading…</p></main>
+<script type="module" src="app.js"></script>
+</body>
+</html>
