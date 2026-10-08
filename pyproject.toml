@@ -1,0 +1,12 @@
+[tool.ruff]
+line-length = 160
+target-version = "py312"
+extend-exclude = ["tests/genlayer_stub"]
+
+[tool.ruff.lint]
+select = ["E9", "F"]
+ignore = ["F403", "F405"]
+
+[tool.ruff.lint.per-file-ignores]
+"contracts/*.py" = ["F403", "F405", "F401"]
+"tests/*.py" = ["F401", "E402"]
