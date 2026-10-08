@@ -1,0 +1,9 @@
+{
+  "name": "workwitness-live",
+  "private": true,
+  "type": "module",
+  "description": "Reproducible live scripts for WorkWitness on GenLayer Studio",
+  "dependencies": {
+    "genlayer-js": "latest"
+  }
+}
