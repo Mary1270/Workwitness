@@ -20,6 +20,7 @@ import {
 } from "./lib.js";
 
 const PAGE = 15;
+const RESEND_AFTER_SECONDS = 3600;
 const view = document.getElementById("view");
 const walletBtn = document.getElementById("wallet");
 let account = "";
@@ -44,8 +45,18 @@ async function readJson(address, functionName, args, fallback) {
 async function send(address, functionName, args = [], value = 0n) {
   if (!writer) throw new Error("Connect a wallet first");
   const hash = await writer.writeContract({ address, functionName, args, value });
-  await writer.waitForTransactionReceipt({ hash, status: "ACCEPTED", retries: 120, interval: 3000 });
-  return hash;
+  let lastError = null;
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    try {
+      await writer.waitForTransactionReceipt({ hash, status: "ACCEPTED", retries: 120, interval: 3000 });
+      return hash;
+    } catch (error) {
+      lastError = error;
+      if (!/failed to fetch|networkerror|load failed/i.test((error && error.message) || String(error))) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+    }
+  }
+  throw new Error("The transaction was sent (" + hash + ") but the connection dropped while waiting for the result. Refresh the page in a minute to see the outcome. " + ((lastError && lastError.message) || ""));
 }
 
 async function connect() {
@@ -162,7 +173,11 @@ function actionsFor(claim, job) {
   if (claim.status === "SUBMITTED" && mine) out.push(`<button data-action="request" data-id="${esc(claim.id)}">Request verification</button><button class="alt" data-action="cancel" data-id="${esc(claim.id)}">Cancel claim</button>`);
   if (claim.status === "SUBMITTED" && !mine) out.push(notice("Only the agent can request verification."));
   if (claim.status === "VERIFYING" && !job) out.push(mine ? `${notice("The verifier has not received this job yet. If this persists for more than an hour, re-send it.")}<button class="alt" data-action="retry-job" data-id="${esc(claim.id)}">Re-send job to verifier</button>` : notice("Waiting for the verifier to receive this job."));
-  if (job && job.state === "FINALIZED" && claim.status !== "FINALIZED") out.push(`${notice("The verdict is final but the claim log or score has not been updated yet.")}<button class="alt" data-action="resend" data-id="${esc(claim.id)}">Re-send final result</button>`);
+  if (job && job.state === "FINALIZED" && claim.status !== "FINALIZED") {
+    const waited = Math.floor(Date.now() / 1000) - Number(job.finalized_at || 0);
+    if (waited >= RESEND_AFTER_SECONDS) out.push(`${notice("The verdict is final but the claim log or score has not been updated yet.")}<button class="alt" data-action="resend" data-id="${esc(claim.id)}">Re-send final result</button>`);
+    else out.push(notice("The verdict is final. The claim log and score update after network finality; refresh in a minute or two. A re-send becomes available after one hour."));
+  }
   if (job && (job.state === "VERIFYING" || job.state === "CHALLENGED")) out.push(`<button data-action="evaluate" data-id="${esc(claim.id)}">Run validator ${job.state === "CHALLENGED" ? "re-evaluation" : "evaluation"}</button><button class="alt" data-action="${job.state === "CHALLENGED" ? "expire-challenge" : "expire"}" data-id="${esc(claim.id)}">Expire if stuck (24h)</button>`);
   if (job && job.state === "VERIFIED") out.push(`<label for="reason">Challenge reason (20–500 characters; costs a refundable bond if upheld)</label><textarea id="reason"></textarea><button data-action="challenge" data-id="${esc(claim.id)}">Challenge result</button><button class="alt" data-action="finalize" data-id="${esc(claim.id)}">Finalize (after window)</button>`);
   if (job && job.state === "CHALLENGE_RESOLVED") out.push(`<button data-action="finalize" data-id="${esc(claim.id)}">Finalize</button>`);
@@ -234,6 +249,13 @@ async function render() {
   window.scrollTo(0, 0);
 }
 
+function friendlyError(error) {
+  const text = (error && error.message) || String(error);
+  if (/failed to fetch|networkerror|load failed/i.test(text)) return "Could not reach the GenLayer Studio RPC (network error). Check your connection or VPN and try again. If it keeps happening, wait a minute: the request may not have been sent.";
+  if (/user rejected|denied/i.test(text)) return "The wallet request was rejected. Approve it in your wallet to continue.";
+  return text;
+}
+
 function say(text, bad = false) {
   const box = document.getElementById("msg");
   if (box) box.innerHTML = notice(text, bad ? "err" : "");
@@ -264,6 +286,9 @@ const handlers = {
   },
   "submit-claim": async () => {
     const urls = parseSources(document.getElementById("sources").value);
+    if (urls.length < 2 || urls.length > 5) throw new Error("Enter 2 to 5 evidence links.");
+    const bad = urls.find((u) => !/^https:\/\//i.test(u));
+    if (bad) throw new Error("Only https:// links are accepted: " + bad);
     say("Submitting… confirm in your wallet.");
     await send(CONFIG.worklog, "submit_claim", [document.getElementById("task").value, document.getElementById("expected").value, JSON.stringify(urls)]);
     const mine = await readJson(CONFIG.worklog, "get_agent_claim_ids", [account], []);
@@ -295,7 +320,7 @@ document.addEventListener("click", async (event) => {
     await handlers[action](target.dataset.id);
     if (!["agent-search", "claim-search", "submit-claim"].includes(action) && !action.endsWith("-prev") && !action.endsWith("-next")) await render();
   } catch (error) {
-    say(error.message || String(error), true);
+    say(friendlyError(error), true);
     target.disabled = false;
   }
 });
@@ -305,9 +330,37 @@ walletBtn.addEventListener("click", async () => {
     await connect();
     render();
   } catch (error) {
-    say(error.message || String(error), true);
+    say(friendlyError(error), true);
   }
 });
 
+async function restoreWallet() {
+  try {
+    if (!window.ethereum) return;
+    const accounts = await window.ethereum.request({ method: "eth_accounts" });
+    if (accounts && accounts.length) {
+      account = accounts[0];
+      writer = createClient({ chain: studionet, account });
+      walletBtn.textContent = shortAddr(account);
+    }
+    if (window.ethereum.on) {
+      window.ethereum.on("accountsChanged", (list) => {
+        if (list && list.length) {
+          account = list[0];
+          writer = createClient({ chain: studionet, account });
+          walletBtn.textContent = shortAddr(account);
+        } else {
+          account = "";
+          writer = null;
+          walletBtn.textContent = "Connect wallet";
+        }
+        render();
+      });
+    }
+  } catch (error) {
+    return;
+  }
+}
+
 window.addEventListener("hashchange", render);
-render();
+restoreWallet().then(render);
