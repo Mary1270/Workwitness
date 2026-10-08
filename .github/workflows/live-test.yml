@@ -1,0 +1,34 @@
+name: live-test
+
+on:
+  workflow_dispatch:
+    inputs:
+      step:
+        description: "deploy | scenarios"
+        required: true
+        default: "deploy"
+
+permissions:
+  contents: read
+
+jobs:
+  live:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install live-test dependencies
+        working-directory: scripts/live
+        run: npm install
+      - name: Run
+        working-directory: scripts/live
+        env:
+          GENLAYER_PRIVATE_KEY: ${{ secrets.GENLAYER_PRIVATE_KEY }}
+          GENLAYER_RPC_URL: ${{ vars.GENLAYER_RPC_URL }}
+          CHALLENGE_WINDOW_SECONDS: ${{ vars.CHALLENGE_WINDOW_SECONDS }}
+          WORKLOG_ADDRESS: ${{ vars.WORKLOG_ADDRESS }}
+          VERIFIER_ADDRESS: ${{ vars.VERIFIER_ADDRESS }}
+          REGISTRY_ADDRESS: ${{ vars.REGISTRY_ADDRESS }}
+        run: node ${{ github.event.inputs.step }}.mjs
