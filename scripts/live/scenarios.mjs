@@ -11,12 +11,25 @@ const BOND = 10n ** 16n;
 const CHALLENGE_BOND = 5n * 10n ** 16n;
 const COOLDOWN = 61;
 
+const PASS_TASK = "Publish Python 3.11.6 security release to the public";
+const PASS_EXPECTED = "Python 3.11.6 was publicly released in October 2023";
+const boundPage = env("BOUND_PAGE_URL", false);
+
+if (!boundPage) {
+  const code = await view(client, verifier, "get_binding_code", [me, PASS_TASK, PASS_EXPECTED]);
+  console.log("A PASS needs the binding code on a supporting page you control.");
+  console.log(`Binding code for ${me}: ${code}`);
+  console.log("Publish a page (for example a raw GitHub file) that states: 'Python 3.11.6 was publicly released in October 2023. Ref " + code + "'");
+  console.log("Then re-run with BOUND_PAGE_URL set to that page's https url.");
+  process.exit(1);
+}
+
 const SCENARIOS = [
   {
     name: "PASS",
-    task: "Publish Python 3.11.6 security release to the public",
-    expected: "Python 3.11.6 was publicly released in October 2023",
-    sources: ["https://www.python.org/downloads/release/python-3116/", "https://devcenter.heroku.com/changelog-items/2696"],
+    task: PASS_TASK,
+    expected: PASS_EXPECTED,
+    sources: [boundPage, "https://www.python.org/downloads/release/python-3116/"],
     challenge: true,
   },
   {
