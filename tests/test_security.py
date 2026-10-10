@@ -16,15 +16,18 @@ from harness import (
     ROOT,
     RT,
     STRANGER,
+    TASK,
     URL_A,
     URL_B,
     WINDOW,
     Base,
     ConsensusFailure,
+    EXPECTED,
     System,
     bad,
     fabricating_llm,
     good,
+    good_unbound,
     neutral,
     sources_json,
     verifier_mod,
@@ -48,7 +51,8 @@ def finalize(s, cid):
 
 
 def run(s, task, urls, who=AGENT, pages=None):
-    RT.pages.update(pages or {u: good(u) for u in urls})
+    code = verifier_mod.binding_code(who, task, EXPECTED)
+    RT.pages.update(pages or {u: good(u, code) for u in urls})
     cid = s.submit(who, task=task, urls=urls)
     s.start(cid, who)
     s.evaluate(cid, who)
@@ -395,7 +399,8 @@ class T08_ScoreFarming(Base):
         ]
         for i, task in enumerate(tasks):
             urls = (f"https://a{i}.alpha{i}.com/x", f"https://b{i}.beta{i}.org/y")
-            RT.pages.update({u: good(u) for u in urls})
+            code = verifier_mod.binding_code(AGENT, task, EXPECTED)
+            RT.pages.update({u: good(u, code) for u in urls})
             cid = s.submit(task=task, urls=urls)
             s.start(cid)
             s.evaluate(cid)
@@ -521,3 +526,62 @@ class StaticDeployChecks(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class T13_EvidenceBinding(Base):
+    def test_public_events_cannot_be_claimed_without_the_binding_code(self):
+        RT.pages = {URL_A: good_unbound(URL_A), URL_B: good_unbound(URL_B)}
+        cid = self.s.submit()
+        self.s.start(cid)
+        self.assertEqual(self.s.evaluate(cid), INSUFFICIENT)
+        job = json.loads(self.s.view(self.s.vf, "get_job", cid))
+        self.assertEqual([item["bound"] for item in job["round1"]["items"]], [False, False])
+
+    def test_code_on_one_supporting_page_is_enough(self):
+        code = verifier_mod.binding_code(AGENT, TASK, EXPECTED)
+        RT.pages = {URL_A: good(URL_A, code), URL_B: good_unbound(URL_B)}
+        cid = self.s.submit()
+        self.s.start(cid)
+        self.assertEqual(self.s.evaluate(cid), PASS)
+        job = json.loads(self.s.view(self.s.vf, "get_job", cid))
+        self.assertEqual([item["bound"] for item in job["round1"]["items"]], [True, False])
+
+    def test_another_agents_code_does_not_bind(self):
+        other = verifier_mod.binding_code(AGENT2, TASK, EXPECTED)
+        RT.pages = {URL_A: good(URL_A, other), URL_B: good(URL_B, other)}
+        cid = self.s.submit()
+        self.s.start(cid)
+        self.assertEqual(self.s.evaluate(cid), INSUFFICIENT)
+
+    def test_code_for_another_task_does_not_bind(self):
+        other = verifier_mod.binding_code(AGENT, "Some different task entirely here", EXPECTED)
+        RT.pages = {URL_A: good(URL_A, other), URL_B: good(URL_B, other)}
+        cid = self.s.submit()
+        self.s.start(cid)
+        self.assertEqual(self.s.evaluate(cid), INSUFFICIENT)
+
+    def test_code_on_an_irrelevant_page_does_not_bind(self):
+        code = verifier_mod.binding_code(AGENT, TASK, EXPECTED)
+        RT.pages = {URL_A: neutral(URL_A) + " " + code, URL_B: good_unbound(URL_B)}
+        cid = self.s.submit()
+        self.s.start(cid)
+        self.assertEqual(self.s.evaluate(cid), INSUFFICIENT)
+
+    def test_contradiction_does_not_need_the_code(self):
+        RT.pages = {URL_A: bad(URL_A), URL_B: bad(URL_B)}
+        cid = self.s.submit()
+        self.s.start(cid)
+        self.assertEqual(self.s.evaluate(cid), FAIL)
+
+    def test_code_is_case_insensitive_and_view_matches(self):
+        code = self.s.view(self.s.vf, "get_binding_code", AGENT, TASK, EXPECTED)
+        self.assertEqual(code, verifier_mod.binding_code(AGENT, TASK, EXPECTED))
+        self.assertTrue(code.startswith("WW-") and len(code) == 19)
+        RT.pages = {URL_A: good(URL_A, code.lower()), URL_B: good_unbound(URL_B)}
+        cid = self.s.submit()
+        self.s.start(cid)
+        self.assertEqual(self.s.evaluate(cid), PASS)
+
+    def test_view_normalizes_whitespace_like_submit_claim(self):
+        a = self.s.view(self.s.vf, "get_binding_code", AGENT, "  " + TASK.replace(" ", "   "), EXPECTED + " ")
+        self.assertEqual(a, verifier_mod.binding_code(AGENT, TASK, EXPECTED))

@@ -36,13 +36,15 @@ def job_of(s, cid):
 
 
 class DeriveVerdictTable(unittest.TestCase):
-    def check(self, statuses, expected):
-        self.assertEqual(verifier_mod.derive_verdict(statuses), expected, statuses)
+    def check(self, statuses, expected, bound=1):
+        self.assertEqual(verifier_mod.derive_verdict(statuses, bound), expected, statuses)
 
     def test_pass_rules(self):
         self.check(["supports", "supports"], PASS)
         self.check(["supports", "supports", "irrelevant"], PASS)
         self.check(["supports", "supports", "unavailable"], PASS)
+        self.check(["supports", "supports"], INSUFFICIENT, bound=0)
+        self.check(["supports", "supports", "irrelevant"], INSUFFICIENT, bound=0)
         self.check(["supports", "supports", "contradicts"], INSUFFICIENT)
         self.check(["supports", "irrelevant"], INSUFFICIENT)
         self.check(["supports", "duplicate"], INSUFFICIENT)
@@ -50,6 +52,7 @@ class DeriveVerdictTable(unittest.TestCase):
 
     def test_fail_rules(self):
         self.check(["contradicts", "contradicts"], FAIL)
+        self.check(["contradicts", "contradicts"], FAIL, bound=0)
         self.check(["contradicts", "irrelevant"], FAIL)
         self.check(["contradicts", "duplicate"], FAIL)
         self.check(["contradicts", "contradicts", "unavailable"], FAIL)
@@ -242,14 +245,16 @@ class Consensus(Base):
         self.assertEqual(job_of(self.s, cid)["state"], "VERIFYING")
 
     def test_sanitize_items_bounds(self):
-        ok = [{"i": 0, "status": "supports", "quote": "q" * 900}]
+        ok = [{"i": 0, "status": "supports", "quote": "q" * 900, "bound": False}]
         clean = verifier_mod.sanitize_items(ok, 1)
         self.assertEqual(len(clean[0]["quote"]), verifier_mod.QUOTE_MAX)
         self.assertIsNone(verifier_mod.sanitize_items(ok, 2))
-        self.assertIsNone(verifier_mod.sanitize_items([{"i": 1, "status": "supports", "quote": ""}], 1))
-        self.assertIsNone(verifier_mod.sanitize_items([{"i": 0, "status": "weird", "quote": ""}], 1))
-        self.assertIsNone(verifier_mod.sanitize_items([{"i": 0, "status": "supports", "quote": "", "digest": "ab"}], 1))
-        self.assertIsNone(verifier_mod.sanitize_items([{"i": 0, "status": "supports"}], 1))
+        self.assertIsNone(verifier_mod.sanitize_items([{"i": 1, "status": "supports", "quote": "", "bound": False}], 1))
+        self.assertIsNone(verifier_mod.sanitize_items([{"i": 0, "status": "weird", "quote": "", "bound": False}], 1))
+        self.assertIsNone(verifier_mod.sanitize_items([{"i": 0, "status": "supports", "quote": "", "bound": False, "digest": "ab"}], 1))
+        self.assertIsNone(verifier_mod.sanitize_items([{"i": 0, "status": "supports", "quote": ""}], 1))
+        self.assertIsNone(verifier_mod.sanitize_items([{"i": 0, "status": "supports", "quote": "", "bound": "yes"}], 1))
+        self.assertIsNone(verifier_mod.sanitize_items([{"i": 0, "status": "irrelevant", "quote": "", "bound": True}], 1))
         self.assertIsNone(verifier_mod.sanitize_items("x", 1))
 
 

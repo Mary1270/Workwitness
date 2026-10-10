@@ -81,7 +81,12 @@ def broken_llm(prompt):
 CLAIM_WORDS = "the quarterly report translation"
 
 
-def good(url):
+def good(url, code=None):
+    ref = code if code is not None else verifier_mod.binding_code(AGENT, TASK, EXPECTED)
+    return "The audit log at " + url + " says " + CLAIM_WORDS + " was published, RESULT: SUCCESS confirmed. Ref " + ref + "."
+
+
+def good_unbound(url):
     return "The audit log at " + url + " says " + CLAIM_WORDS + " was published, RESULT: SUCCESS confirmed."
 
 
