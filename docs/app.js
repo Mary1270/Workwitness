@@ -160,7 +160,7 @@ function evidenceBlock(title, round, sources) {
   const body = items.length
     ? sources.map((s, i) => {
         const it = items[i] || {};
-        return `<div class="src">${sourceLink(s.url)}<br><b>${esc(sourceStatusLabel(it.status))}</b>${it.quote ? `<q>“${esc(it.quote)}”</q>` : ""}</div>`;
+        return `<div class="src">${sourceLink(s.url)}<br><b>${esc(sourceStatusLabel(it.status))}</b>${it.bound ? ` <span class="tag">contains the agent's binding code</span>` : ""}${it.quote ? `<q>“${esc(it.quote)}”</q>` : ""}</div>`;
       }).join("")
     : notice("Per-source details were not recorded for this round (for example after a timeout).");
   return `<h3>${esc(title)} — ${badge(round.verdict)}</h3>${body}`;
@@ -187,9 +187,10 @@ function actionsFor(claim, job) {
 async function pageClaim(id) {
   const claim = await readJson(CONFIG.worklog, "get_claim", [id], null);
   if (!claim) return notice("Claim not found.", "err");
-  const [job, rec] = await Promise.all([
+  const [job, rec, code] = await Promise.all([
     readJson(CONFIG.verifier, "get_job", [id], null),
     readJson(CONFIG.registry, "get_record", [id], null),
+    read(CONFIG.verifier, "get_binding_code", [claim.agent, claim.task, claim.expected_result]).catch(() => ""),
   ]);
   const state = job ? job.state : claim.status;
   const verified = job && job.round1;
@@ -201,7 +202,8 @@ async function pageClaim(id) {
   <div class="card claimed"><span class="tag">Agent claimed — not verified</span>
   <h3>Task</h3>${esc(claim.task)}<h3>Expected result</h3>${esc(claim.expected_result)}
   <h3>Submitted evidence links</h3>${claim.sources.map((s) => `<div class="src">${sourceLink(s.url)}<br><span class="muted">domain: ${esc(s.domain)}</span></div>`).join("")}
-  <p class="muted">Agent ${addrLink(claim.agent)} · bond ${esc(fmtGen(claim.bond))}</p></div>
+  <p class="muted">Agent ${addrLink(claim.agent)} · bond ${esc(fmtGen(claim.bond))}</p>
+  ${code ? `<p class="muted">Binding code for this agent and claim: <code>${esc(code)}</code>. A PASS requires this exact code on at least one supporting evidence page.</p>` : ""}</div>
   <div class="card verified"><span class="tag">Validators independently verified</span>
   ${job && job.timed_out ? "No validator evaluation took place: the verdict INSUFFICIENT EVIDENCE was assigned because verification timed out." : verified ? `${rounds}<p class="muted">Consensus is on the verdict: each validator fetched every source itself and had to reach the same verdict as the leader. Quotes shown are the leader's report and were checked to be exact page text.</p>` : "Nothing has been independently verified yet."}</div>
   <h2>Lifecycle</h2><div class="card">${timeline(claim, job)}${job && job.challenge ? `<p class="muted">Challenge reason (not used as evidence): ${esc(job.challenge.reason)}</p>` : ""}</div>
@@ -221,6 +223,8 @@ async function pageSubmit() {
   <label for="task">Task done (20–500 characters)</label><textarea id="task"></textarea>
   <label for="expected">Expected result (10–500 characters)</label><textarea id="expected"></textarea>
   <label for="sources">Evidence links (separate with spaces, commas or new lines)</label><textarea id="sources" placeholder="https://…"></textarea>
+  <div class="notice">A PASS verdict requires the <b>binding code</b> of this agent and claim to appear on at least one supporting evidence page you control (for example a GitHub release note or commit message). Publish the code there, then submit. The code depends only on your wallet address, the task text and the expected result.</div>
+  <button class="alt" data-action="binding-code" type="button">Show my binding code</button>
   <button data-action="submit-claim" type="button">Submit claim</button></div><div id="msg"></div>`;
 }
 
@@ -284,6 +288,11 @@ const handlers = {
     await send(CONFIG.worklog, "withdraw");
     render();
   },
+  "binding-code": async () => {
+    if (!account) return say("Connect a wallet first.", true);
+    const code = await read(CONFIG.verifier, "get_binding_code", [account, document.getElementById("task").value, document.getElementById("expected").value]);
+    say("Binding code for your wallet, this task and this expected result: " + code);
+  },
   "submit-claim": async () => {
     const urls = parseSources(document.getElementById("sources").value);
     if (urls.length < 2 || urls.length > 5) throw new Error("Enter 2 to 5 evidence links.");
@@ -318,7 +327,7 @@ document.addEventListener("click", async (event) => {
   try {
     const action = target.dataset.action;
     await handlers[action](target.dataset.id);
-    if (!["agent-search", "claim-search", "submit-claim"].includes(action) && !action.endsWith("-prev") && !action.endsWith("-next")) await render();
+    if (!["agent-search", "claim-search", "submit-claim", "binding-code"].includes(action) && !action.endsWith("-prev") && !action.endsWith("-next")) await render();
   } catch (error) {
     say(friendlyError(error), true);
     target.disabled = false;
