@@ -63,11 +63,13 @@ Failure and disagreement handling: if validators do not agree, the transaction f
 Per source (after fetching and de-duplicating identical content): `supports`, `contradicts`, `irrelevant`, `unavailable`, `duplicate`.
 
 ```
-S = #supports, C = #contradicts, U = #unavailable
-PASS   if S ≥ 2 and C = 0
+S = #supports, C = #contradicts, U = #unavailable, B = #supports whose page text contains the binding code
+PASS   if S ≥ 2 and C = 0 and B ≥ 1   (B = #supporting sources that contain the binding code)
 FAIL   if C ≥ 1 and S = 0 and (U = 0 or C ≥ 2)
 else   INSUFFICIENT_EVIDENCE
 ```
+
+The binding code is `WW-` plus the first 16 hex characters (upper case) of SHA-256 of `agent|task|expected_result` (lower-cased, whitespace collapsed). Every item carries a boolean `bound`, recomputed by each validator from its own fetch; a leader item whose `bound` flag the validator cannot reproduce is a disagreement. Without a bound supporting page two supporting sources still give only `INSUFFICIENT_EVIDENCE`.
 
 Page text is capped at 16 000 characters. Runs of `<<<`/`>>>` in the page and in the claim text are collapsed before prompting, so neither can forge the page delimiters. A `supports`/`contradicts` needs a 15–200 character quote that is an exact substring of the fetched text. Sources are guaranteed to be from distinct registrable domains by `WorkLog`, so `S ≥ 2` means two independent domains. A model/runtime error for a source is `unavailable`, which can never create a FAIL on its own.
 

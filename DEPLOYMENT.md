@@ -31,7 +31,9 @@ Evidence is real and public. Verdicts depend on live pages and a live model.
 | Step | Wallet | Contract | Method | Arguments | Value |
 |---|---|---|---|---|---|
 | 1 | `0x6921398611F6c4793D745348660912D44d4F8479` | WorkLog | `deposit` | none | 0.1 GEN (the Studio Value field is in GEN, not wei) |
-| 2 | `0x6921398611F6c4793D745348660912D44d4F8479` | WorkLog | `submit_claim` | `Publish Python 3.11.6 security release to the public` · `Python 3.11.6 was publicly released in October 2023` · `["https://www.python.org/downloads/release/python-3116/","https://devcenter.heroku.com/changelog-items/2696"]` | 0 |
+| 1b | any | SkillVerifier | `get_binding_code` | the agent wallet · `Publish Python 3.11.6 security release to the public` · `Python 3.11.6 was publicly released in October 2023` | — |
+| 1c | the agent wallet | GitHub | publish a file in a repo the agent controls whose text is `Python 3.11.6 was publicly released in October 2023. Ref <binding code>`; use its raw url as the first source | — | — |
+| 2 | `0x6921398611F6c4793D745348660912D44d4F8479` | WorkLog | `submit_claim` | `Publish Python 3.11.6 security release to the public` · `Python 3.11.6 was publicly released in October 2023` · `["<raw url of the file from 1c>","https://www.python.org/downloads/release/python-3116/"]` | 0 |
 | 3 | `0x6921398611F6c4793D745348660912D44d4F8479` | WorkLog | `request_verification` | `1` | 0 |
 | 4 | `0x6921398611F6c4793D745348660912D44d4F8479` | SkillVerifier | `evaluate` | `1` | 0 |
 | 5 | any | SkillVerifier | `get_job` | `1` | — |
@@ -45,7 +47,7 @@ Evidence is real and public. Verdicts depend on live pages and a live model.
 | 12 | `0x6921398611F6c4793D745348660912D44d4F8479` | WorkLog | `withdraw` | none | 0 |
 | 13 | `0x9Bf4a51B888C6FFBF337a25BF3179B07A6259128` | SkillVerifier | `withdraw` | none | 0 |
 
-FAIL and INSUFFICIENT_EVIDENCE cases (use new task text and new URLs each time, wait 60 s between submissions):
+A PASS needs the binding code on a supporting page the agent controls; without it two supporting sources give INSUFFICIENT_EVIDENCE. FAIL and INSUFFICIENT_EVIDENCE cases need no code (use new task text and new URLs each time, wait 60 s between submissions):
 
 | Case | Task | Expected result | Sources |
 |---|---|---|---|

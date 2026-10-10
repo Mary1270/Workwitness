@@ -41,7 +41,7 @@ Consensus in the stub: the leader plus 4 validators; accepted when strictly more
 | ScoreRegistry | `tests/test_score_registry.py` | score math and bounds, duplicate-work and daily-cap rules, replay protection, history, authorization |
 | Message timing | `tests/test_skill_verifier.py::MessageTiming` | score/bond messages are `finalized`, orphan jobs cannot finalize |
 | Recovery | `tests/test_recovery.py` | dropped `open_job`, `close_claim` and `record_result` messages and their repair |
-| Security | `tests/test_security.py` | one class per threat T01–T11 of `THREAT_MODEL.md`, end to end through all three contracts, plus static checker tests |
+| Security | `tests/test_security.py` | one class per threat T01–T11 and T13 (evidence binding) of `THREAT_MODEL.md`, end to end through all three contracts, plus static checker tests |
 | Frontend helpers | `tests/frontend/lib.test.mjs` | escaping, routing, formatting, URL safety |
 
 ## Live testing

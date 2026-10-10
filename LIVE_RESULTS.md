@@ -1,5 +1,7 @@
 # Live results (GenLayer Studio, 2026-10-08)
 
+> These results are for v1.0.0 (before evidence binding). v1.1.0 adds the binding code (a PASS requires the agent-specific code on a supporting page); its live results are listed at the end of this file once collected.
+
 Test build, challenge window 300 s. All three contracts deployed and wired by one deployer wallet.
 
 | Contract | Address |
@@ -40,3 +42,22 @@ Final score 476 (500, -2, +10, -2, -30).
 - The frontend (GitHub Pages, `docs/`) completed a full cycle with a second wallet: deposit, submit, request verification, evaluate, challenge (bond deposited by the UI), re-evaluation, finalize, withdraw. A repeat PASS for the same sources earned +0 (verified, no credit), as designed.
 - Not exercised live: resend_finalization and retry_open_job (nothing stalled).
 - Not measured: protocol finality on a production network. Studio finalizes in minutes.
+
+## v1.1.0 (evidence binding), live on GenLayer Studio, 2026-10-10
+
+Test build, challenge window 300 s. Deployer and agent wallet `0xf73699c4A8C35a10fBFa74ca07CbEcA99b148Ffd`.
+
+| Contract | Address |
+|---|---|
+| ScoreRegistry | `0xAced46f49Be7b93f71C3cd31301B1A11938311d8` |
+| WorkLog | `0x07056A665EED448BCA3AE326F76045Aa0570f6ca` |
+| SkillVerifier | `0x9b9d9Ff661f0714bdcFE218e3cfFb991c9f59048` |
+
+| Claim | Sources | Result |
+|---|---|---|
+| 1 (no binding code anywhere) | python.org + devcenter.heroku.com, both `supports` | `INSUFFICIENT_EVIDENCE`, `bound: false` on both sources |
+| 2 (binding code `WW-26A3C9D635EEA7D3` on a GitHub raw file) | raw.githubusercontent.com proof file + python.org, both `supports` | `PASS`, `bound: true` on the proof file, `bound: false` on python.org |
+
+The binding code is a hash of the agent address, the task and the expected result; the code used in claim 2 was also recomputed independently offline and matched `get_binding_code`.
+
+After the challenge window, `finalize(2)` was called and its effects were read back: `SkillVerifier.get_job` state `FINALIZED` with final verdict `PASS`; `ScoreRegistry.get_agent` score 510 (passes 1, credited 1, history `["2"]`) for the claim submitter only; `WorkLog.get_claim` status `FINALIZED`, verdict `PASS`, claim bond returned.

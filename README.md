@@ -8,7 +8,7 @@ An agent submits a *claim*: a task description, the result it expects, and 2–5
 
 | Verdict | Meaning |
 |---|---|
-| `PASS` | At least two independent sources were observed by the validators explicitly supporting the claimed result, and none contradicted it. |
+| `PASS` | At least two independent sources were observed by the validators explicitly supporting the claimed result, none contradicted it, **and at least one supporting page carries the agent's binding code** (see below). |
 | `FAIL` | At least one independent source was observed explicitly contradicting the claimed result (with an exact quote), nothing supported it, and no source was unavailable unless two sources contradicted it. |
 | `INSUFFICIENT_EVIDENCE` | Everything else: sources unavailable, irrelevant, ambiguous, duplicated or in conflict. Validators are never forced to choose PASS or FAIL. |
 
@@ -47,6 +47,7 @@ Cross-contract messages are asynchronous; two recovery calls (`WorkLog.retry_ope
 2. During `evaluate`, the leader **and every validator** independently fetch every source (text capped at 16 000 characters) and judge each one: `supports`, `contradicts`, `irrelevant`, `unavailable` or `duplicate` (identical content behind two URLs counts once).
 3. A `supports` or `contradicts` judgment only counts if its quote is an exact substring of the page text that node fetched. A fabricated quote is downgraded to `irrelevant` in code.
 4. A verdict is derived from the statuses by a fixed rule, never by a submitter label.
+5. **Evidence binding.** Every claim has a *binding code* `WW-XXXXXXXXXXXXXXXX`, a hash of the agent address, the task and the expected result (`SkillVerifier.get_binding_code`). A PASS needs that exact code on at least one page the validators judged as supporting. An agent can therefore not collect reputation for a public event it has no link to (for example someone else's release): it must publish the code on an artifact it controls (a GitHub file or release note, a commit message) that also states the result, and have a second independent domain corroborate. Contradictions (FAIL) never need the code. The code proves the agent is linked to the evidence, not that the agent's own page is truthful; that remains covered by the independent second source, the challenge window and the bond. The code must appear within the first 16 000 characters of the page.
 
 ## Consensus model
 
@@ -102,7 +103,7 @@ No third-party Python packages are needed.
 
 ```bash
 python3 scripts/check_contracts.py                         # deploy-readiness rules
-python3 -m unittest discover -s tests -t tests -v          # 208 offline tests
+python3 -m unittest discover -s tests -t tests -v          # 216 offline tests
 node --test tests/frontend/lib.test.mjs                    # frontend helpers
 python3 scripts/build_release.py                           # dist/ + SHA-256 manifest
 ```
@@ -115,7 +116,7 @@ Frontend: serve `frontend/` with any static server, put the three deployed addre
 
 ## Honest status
 
-The three contracts were deployed and exercised end to end on GenLayer Studio (test build, 300 s challenge window): submit, open_job, evaluate with validator consensus, challenge and re-evaluation, finalize, score recording, claim closing, bond refunds and withdraw all worked, and PASS, FAIL and INSUFFICIENT_EVIDENCE verdicts were each observed. Addresses and measurements are in LIVE_RESULTS.md.
+The three contracts were deployed and exercised end to end on GenLayer Studio (test build, 300 s challenge window); v1.0.0 covered the full lifecycle and v1.1.0 (evidence binding) was re-deployed and verified live with a negative case (no binding code, INSUFFICIENT_EVIDENCE) and a positive case (code on a supporting page, PASS): submit, open_job, evaluate with validator consensus, challenge and re-evaluation, finalize, score recording, claim closing, bond refunds and withdraw all worked, and PASS, FAIL and INSUFFICIENT_EVIDENCE verdicts were each observed. Addresses and measurements are in LIVE_RESULTS.md.
 
 Not covered by the live run: the recovery calls (retry_open_job, resend_finalization) were never needed, and finality on a production network was not measured. The offline suite runs against a hand-written SDK stub, so it complements the live run and does not replace it. No third-party audit has been done.
 
