@@ -18,6 +18,8 @@ TEXT_CAP = 16000
 QUOTE_MIN = 15
 QUOTE_MAX = 200
 MIN_SUPPORTING = 2
+BIND_PREFIX = "WW-"
+BIND_LENGTH = 16
 VERIFY_TIMEOUT = 86400
 CHALLENGE_EVAL_TIMEOUT = 86400
 EVAL_GRACE = 3600
@@ -79,12 +81,17 @@ def quote_is_relevant(quote, claim_tokens):
     return len(set(tokens_of(quote)) & set(claim_tokens)) >= need
 
 
-def derive_verdict(statuses):
+def binding_code(agent, task, expected):
+    material = str(agent).lower() + "|" + collapse(task).lower() + "|" + collapse(expected).lower()
+    return BIND_PREFIX + hashlib.sha256(material.encode("utf-8")).hexdigest()[:BIND_LENGTH].upper()
+
+
+def derive_verdict(statuses, bound_supports=0):
     supports = statuses.count("supports")
     contradicts = statuses.count("contradicts")
     unavailable = statuses.count("unavailable")
     if supports >= MIN_SUPPORTING and contradicts == 0:
-        return PASS
+        return PASS if bound_supports >= 1 else INSUFFICIENT
     if contradicts >= 1 and supports == 0 and (unavailable == 0 or contradicts >= 2):
         return FAIL
     return INSUFFICIENT
@@ -151,32 +158,40 @@ def fetch_texts(sources):
     return texts
 
 
-def evaluate_texts(task, expected, sources, texts):
+def evaluate_texts(task, expected, sources, texts, code):
     claim_tokens = tokens_of(task + " " + expected)
     items = []
     seen = []
     for index, source in enumerate(sources):
         text = texts[index]
         if text == "":
-            items.append({"i": index, "status": "unavailable", "quote": ""})
+            items.append({"i": index, "status": "unavailable", "quote": "", "bound": False})
             continue
         digest = hashlib.sha256(text.lower().encode("utf-8")).hexdigest()
         if digest in seen:
-            items.append({"i": index, "status": "duplicate", "quote": ""})
+            items.append({"i": index, "status": "duplicate", "quote": "", "bound": False})
             continue
         seen.append(digest)
         status, quote = judge_source(task, expected, source["url"], text, claim_tokens)
-        items.append({"i": index, "status": status, "quote": quote})
+        bound = status == "supports" and code.lower() in text.lower()
+        items.append({"i": index, "status": status, "quote": quote, "bound": bound})
     return items
 
 
-def run_leader(task, expected, sources):
-    items = evaluate_texts(task, expected, sources, fetch_texts(sources))
-    verdict = derive_verdict([item["status"] for item in items])
+def verdict_of(items):
+    return derive_verdict(
+        [item["status"] for item in items],
+        len([item for item in items if item["bound"]]),
+    )
+
+
+def run_leader(task, expected, sources, code):
+    items = evaluate_texts(task, expected, sources, fetch_texts(sources), code)
+    verdict = verdict_of(items)
     return json.dumps({"verdict": verdict, "items": items}, sort_keys=True)
 
 
-def check_leader(leaders_res, task, expected, sources):
+def check_leader(leaders_res, task, expected, sources, code):
     if not isinstance(leaders_res, gl.vm.Return):
         return False
     try:
@@ -187,14 +202,16 @@ def check_leader(leaders_res, task, expected, sources):
         return False
     if theirs not in VERDICTS or items is None:
         return False
-    if derive_verdict([item["status"] for item in items]) != theirs:
+    if verdict_of(items) != theirs:
         return False
     texts = fetch_texts(sources)
-    mine = derive_verdict([item["status"] for item in evaluate_texts(task, expected, sources, texts)])
-    if mine != theirs:
+    mine_items = evaluate_texts(task, expected, sources, texts, code)
+    if verdict_of(mine_items) != theirs:
         return False
     claim_tokens = tokens_of(task + " " + expected)
     for item in items:
+        if item["bound"] and code.lower() not in texts[item["i"]].lower():
+            return False
         if item["status"] not in ("supports", "contradicts"):
             continue
         quote = collapse(item["quote"])
@@ -212,13 +229,16 @@ def sanitize_items(items, count):
         return None
     clean = []
     for index, item in enumerate(items):
-        if not isinstance(item, dict) or set(item.keys()) != {"i", "status", "quote"} or item["i"] != index:
+        if not isinstance(item, dict) or set(item.keys()) != {"i", "status", "quote", "bound"} or item["i"] != index:
             return None
         status = item["status"]
         quote = item["quote"]
+        bound = item["bound"]
         if status not in STATUSES or not isinstance(quote, str) or CONTROL.search(quote):
             return None
-        clean.append({"i": index, "status": status, "quote": quote[:QUOTE_MAX]})
+        if not isinstance(bound, bool) or (bound and status != "supports"):
+            return None
+        clean.append({"i": index, "status": status, "quote": quote[:QUOTE_MAX], "bound": bound})
     return clean
 
 
@@ -226,7 +246,7 @@ def parse_leader(raw, count):
     data = json.loads(raw)
     verdict = data["verdict"]
     items = sanitize_items(data.get("items"), count)
-    if items is None or derive_verdict([item["status"] for item in items]) != verdict:
+    if items is None or verdict_of(items) != verdict:
         items = []
     return {"verdict": verdict, "items": items}
 
@@ -344,14 +364,15 @@ class SkillVerifier(gl.Contract):
         task = job["task"]
         expected = job["expected_result"]
         sources = job["sources"]
+        code = binding_code(job["agent"], task, expected)
         who = str(gl.message.sender_address)
         started = job["begun_at"] if round_no == 1 else job["challenge"]["at"]
         if who != job["agent"] and (round_no == 1 or who != job["challenge"]["challenger"]):
             if _now() < started + EVAL_GRACE:
                 _fail("only the agent or challenger may evaluate during the grace period")
         raw = gl.vm.run_nondet_unsafe(
-            lambda: run_leader(task, expected, sources),
-            lambda leaders_res: check_leader(leaders_res, task, expected, sources),
+            lambda: run_leader(task, expected, sources, code),
+            lambda leaders_res: check_leader(leaders_res, task, expected, sources, code),
         )
         result = parse_leader(raw, len(sources))
         now = _now()
@@ -480,6 +501,10 @@ class SkillVerifier(gl.Contract):
         return json.dumps(self._job(claim_id), sort_keys=True)
 
     @gl.public.view
+    def get_binding_code(self, agent: str, task: str, expected_result: str) -> str:
+        return binding_code(_addr(agent), " ".join(str(task).split()), " ".join(str(expected_result).split()))
+
+    @gl.public.view
     def get_job_count(self) -> int:
         return len(self.job_ids)
 
@@ -519,6 +544,7 @@ class SkillVerifier(gl.Contract):
                 "resend_after": RESEND_AFTER,
                 "max_resends": MAX_RESENDS,
                 "min_supporting_sources": MIN_SUPPORTING,
+                "binding_required": True,
                 "worklog": self.worklog,
                 "registry": self.registry,
                 "owner": self.owner,
